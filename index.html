@@ -366,7 +366,6 @@
       const result = document.getElementById('result');
       result.classList.add('fade-in');
 
-      // 準備數據
       const matches = galeShapley();
       if (matches.length === 0) {
         result.textContent = '無任何配對成功。';
@@ -378,17 +377,16 @@
 
     function galeShapley() {
       const matches = [];
-      const freeProposers = [...aGroup]; // A組提議者
-      const engagements = {}; // B組當前配對
-      const proposerRankings = {...choices}; // A組志願序
-      const acceptorRankings = {...choices}; // B組志願序
+      const freeProposers = [...aGroup];
+      const engagements = {};
+      const proposerRankings = {...choices};
+      const acceptorRankings = {...choices};
 
-      // 為B組建立優先級映射（反向排名）
       const acceptorPriority = {};
       bGroup.forEach(b => {
         acceptorPriority[b] = {};
         acceptorRankings[b].forEach((a, index) => {
-          acceptorPriority[b][a] = index; // 越小越優先
+          acceptorPriority[b][a] = index;
         });
       });
 
@@ -399,7 +397,7 @@
           freeProposers.shift();
           continue;
         }
-        const acceptor = preferences.shift(); // 提議給第一志願
+        const acceptor = preferences.shift();
         if (!engagements[acceptor]) {
           engagements[acceptor] = proposer;
           freeProposers.shift();
@@ -413,7 +411,6 @@
         }
       }
 
-      // 格式化配對結果
       for (const acceptor in engagements) {
         matches.push([engagements[acceptor], acceptor]);
       }
