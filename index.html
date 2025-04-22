@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-  <title>匿名配對</title>
+  <title>匿名志願序配對</title>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <style>
@@ -45,7 +45,6 @@
       border-radius: 8px;
       font-size: 16px;
       margin-bottom: 15px;
-      transition: border-color 0.3s;
       box-sizing: border-box;
       -webkit-appearance: none;
       background: #fff;
@@ -101,6 +100,28 @@
       from { opacity: 0; }
       to { opacity: 1; }
     }
+    .sortable {
+      list-style: none;
+      padding: 0;
+      margin: 10px 0;
+      min-height: 50px;
+      border: 2px dashed #4A90E2;
+      border-radius: 8px;
+    }
+    .sortable li {
+      background: #f0f8ff;
+      padding: 10px;
+      margin: 5px;
+      border-radius: 5px;
+      cursor: move;
+      touch-action: none;
+      user-select: none;
+      font-size: 16px;
+    }
+    .sortable li.dragging {
+      opacity: 0.5;
+      background: #2ECC71;
+    }
     @media (max-width: 600px) {
       .container {
         padding: 15px;
@@ -116,12 +137,12 @@
 </head>
 <body>
   <div class="container">
-    <h2>匿名配對</h2>
+    <h2>匿名志願序配對</h2>
     <div id="input-section">
       <label>您的名稱</label>
       <select id="voter"></select>
-      <label>選擇的對方名稱</label>
-      <select id="chosen"></select>
+      <label>拖曳排序您的志願序（由高到低）</label>
+      <ul id="sortable" class="sortable"></ul>
       <button onclick="submitChoice()">提交</button>
       <p class="progress" id="progress">已提交：0/8</p>
       <p class="status" id="submitted">已提交：無</p>
@@ -153,7 +174,7 @@
 
     // 清理無效數據
     for (let voter in choices) {
-      if (!voters.includes(voter) || !voters.includes(choices[voter])) {
+      if (!voters.includes(voter)) {
         delete choices[voter];
       }
     }
@@ -161,7 +182,7 @@
       localStorage.setItem('choices', JSON.stringify(choices));
     }
 
-    // 更新“您的名稱”下拉選單（僅顯示未提交者）
+    // 更新“您的名稱”下拉選單
     function updateVoterOptions() {
       const voterSelect = document.getElementById('voter');
       voterSelect.innerHTML = '';
@@ -181,10 +202,96 @@
         });
         voterSelect.disabled = false;
       }
-      // 調試：檢查notSubmitted內容
-      console.log('未提交名稱:', notSubmitted);
-      // 延遲更新對方選單，確保voter有值
-      setTimeout(updateChosenOptions, 0);
+      setTimeout(updateSortableOptions, 0);
+    }
+
+    // 更新拖曳排序選項
+    function updateSortableOptions() {
+      const voter = document.getElementById('voter').value;
+      const sortable = document.getElementById('sortable');
+      sortable.innerHTML = '';
+      if (!voter || voter === '') {
+        const li = document.createElement('li');
+        li.textContent = '請先選擇您的名稱';
+        sortable.appendChild(li);
+        return;
+      }
+      const options = aGroup.includes(voter) ? bGroup : aGroup;
+      options.forEach(opt => {
+        const li = document.createElement('li');
+        li.textContent = opt;
+        li.setAttribute('draggable', true);
+        li.addEventListener('dragstart', handleDragStart);
+        li.addEventListener('dragover', handleDragOver);
+        li.addEventListener('drop', handleDrop);
+        li.addEventListener('touchstart', handleTouchStart, { passive: false });
+        li.addEventListener('touchmove', handleTouchMove, { passive: false });
+        li.addEventListener('touchend', handleTouchEnd);
+        sortable.appendChild(li);
+      });
+    }
+
+    // 拖曳事件處理
+    let draggedItem = null;
+    function handleDragStart(e) {
+      draggedItem = e.target;
+      e.target.classList.add('dragging');
+    }
+    function handleDragOver(e) {
+      e.preventDefault();
+    }
+    function handleDrop(e) {
+      e.preventDefault();
+      const dropTarget = e.target.closest('li');
+      if (dropTarget && draggedItem !== dropTarget) {
+        const sortable = document.getElementById('sortable');
+        const items = Array.from(sortable.children);
+        const draggedIndex = items.indexOf(draggedItem);
+        const dropIndex = items.indexOf(dropTarget);
+        if (draggedIndex < dropIndex) {
+          sortable.insertBefore(draggedItem, dropTarget.nextSibling);
+        } else {
+          sortable.insertBefore(draggedItem, dropTarget);
+        }
+      }
+      draggedItem.classList.remove('dragging');
+      draggedItem = null;
+    }
+
+    // 觸控事件處理（iOS相容）
+    let touchItem = null;
+    let touchStartY = 0;
+    function handleTouchStart(e) {
+      e.preventDefault();
+      touchItem = e.target.closest('li');
+      touchItem.classList.add('dragging');
+      touchStartY = e.touches[0].clientY;
+    }
+    function handleTouchMove(e) {
+      e.preventDefault();
+      const touch = e.touches[0];
+      const sortable = document.getElementById('sortable');
+      const items = Array.from(sortable.children);
+      const touchY = touch.clientY;
+      const dropTarget = items.find(item => {
+        const rect = item.getBoundingClientRect();
+        return touchY >= rect.top && touchY <= rect.bottom && item !== touchItem;
+      });
+      if (dropTarget) {
+        const draggedIndex = items.indexOf(touchItem);
+        const dropIndex = items.indexOf(dropTarget);
+        if (draggedIndex < dropIndex) {
+          sortable.insertBefore(touchItem, dropTarget.nextSibling);
+        } else {
+          sortable.insertBefore(touchItem, dropTarget);
+        }
+      }
+    }
+    function handleTouchEnd(e) {
+      if (touchItem) {
+        touchItem.classList.remove('dragging');
+        touchItem = null;
+      }
     }
 
     // 更新進度顯示
@@ -201,37 +308,12 @@
       document.getElementById('not-submitted').innerHTML = `<strong>未提交：</strong>${notSubmitted.length > 0 ? notSubmitted.join('、') : '無'}`;
     }
 
-    // 動態填充對方名稱選項
-    function updateChosenOptions() {
-      const voter = document.getElementById('voter').value;
-      const chosenSelect = document.getElementById('chosen');
-      chosenSelect.innerHTML = '';
-      if (!voter || voter === '') {
-        const option = document.createElement('option');
-        option.value = '';
-        option.text = '請先選擇您的名稱';
-        chosenSelect.appendChild(option);
-        chosenSelect.disabled = true;
-        return;
-      }
-      chosenSelect.disabled = false;
-      const options = aGroup.includes(voter) ? bGroup : aGroup;
-      options.forEach(opt => {
-        const option = document.createElement('option');
-        option.value = opt;
-        option.text = opt;
-        chosenSelect.appendChild(option);
-      });
-      // 調試：檢查chosen選項
-      console.log('對方選項:', options);
-    }
-
-    // 初始化選單和狀態
+    // 初始化
     try {
       updateVoterOptions();
       updateProgress();
       updateSubmissionStatus();
-      document.getElementById('voter').addEventListener('change', updateChosenOptions);
+      document.getElementById('voter').addEventListener('change', updateSortableOptions);
     } catch (e) {
       alert('初始化失敗，請重新載入頁面！錯誤：' + e.message);
     }
@@ -239,9 +321,10 @@
     // 提交選擇
     function submitChoice() {
       const voter = document.getElementById('voter').value;
-      const chosen = document.getElementById('chosen').value;
-      if (!voter || !chosen || !voters.includes(voter) || !voters.includes(chosen)) {
-        alert('請選擇有效名稱！');
+      const sortable = document.getElementById('sortable');
+      const preferences = Array.from(sortable.children).map(li => li.textContent);
+      if (!voter || preferences.length === 0 || !voters.includes(voter)) {
+        alert('請選擇有效名稱並完成志願序排序！');
         return;
       }
       if (choices[voter]) {
@@ -252,7 +335,12 @@
         alert('已達8人提交上限，請檢查結果！');
         return;
       }
-      choices[voter] = chosen;
+      const expectedOptions = aGroup.includes(voter) ? bGroup : aGroup;
+      if (preferences.length !== expectedOptions.length || !preferences.every(p => expectedOptions.includes(p))) {
+        alert('志願序無效，請重新排序！');
+        return;
+      }
+      choices[voter] = preferences;
       if (storageAvailable) {
         try {
           localStorage.setItem('choices', JSON.stringify(choices));
@@ -270,26 +358,66 @@
       }
     }
 
-    // 顯示所有配對結果
+    // Gale-Shapley算法計算穩定配對
     function showResults() {
       document.getElementById('input-section').style.display = 'none';
       document.getElementById('check-button').classList.add('hidden');
       document.getElementById('result-section').classList.remove('hidden');
       const result = document.getElementById('result');
       result.classList.add('fade-in');
-      const matches = [];
-      for (let voter in choices) {
-        const chosen = choices[voter];
-        if (choices[chosen] === voter && !matches.some(m => m.includes(voter))) {
-          matches.push([voter, chosen]);
-        }
-      }
+
+      // 準備數據
+      const matches = galeShapley();
       if (matches.length === 0) {
         result.textContent = '無任何配對成功。';
         result.classList.add('error');
       } else {
         result.textContent = '配對成功：' + matches.map(m => `${m[0]} 與 ${m[1]}`).join('，');
       }
+    }
+
+    function galeShapley() {
+      const matches = [];
+      const freeProposers = [...aGroup]; // A組提議者
+      const engagements = {}; // B組當前配對
+      const proposerRankings = {...choices}; // A組志願序
+      const acceptorRankings = {...choices}; // B組志願序
+
+      // 為B組建立優先級映射（反向排名）
+      const acceptorPriority = {};
+      bGroup.forEach(b => {
+        acceptorPriority[b] = {};
+        acceptorRankings[b].forEach((a, index) => {
+          acceptorPriority[b][a] = index; // 越小越優先
+        });
+      });
+
+      while (freeProposers.length > 0) {
+        const proposer = freeProposers[0];
+        const preferences = proposerRankings[proposer];
+        if (!preferences || preferences.length === 0) {
+          freeProposers.shift();
+          continue;
+        }
+        const acceptor = preferences.shift(); // 提議給第一志願
+        if (!engagements[acceptor]) {
+          engagements[acceptor] = proposer;
+          freeProposers.shift();
+        } else {
+          const currentProposer = engagements[acceptor];
+          if (acceptorPriority[acceptor][proposer] < acceptorPriority[acceptor][currentProposer]) {
+            engagements[acceptor] = proposer;
+            freeProposers.shift();
+            freeProposers.push(currentProposer);
+          }
+        }
+      }
+
+      // 格式化配對結果
+      for (const acceptor in engagements) {
+        matches.push([engagements[acceptor], acceptor]);
+      }
+      return matches.sort((a, b) => voters.indexOf(a[0]) - voters.indexOf(b[0]));
     }
 
     // 清除數據
