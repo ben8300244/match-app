@@ -97,6 +97,7 @@
       <table id="submissions">
         <thead>
           <tr>
+            <th>輪次</th>
             <th>名稱</th>
             <th>志願序</th>
             <th>提交時間</th>
@@ -129,9 +130,7 @@
       try {
         console.log('開始載入數據');
         const tbody = document.getElementById('submissions')?.querySelector('tbody');
-        if (!tbody) {
-          throw new Error('找不到表格元素');
-        }
+        if (!tbody) throw new Error('找不到表格元素');
         tbody.innerHTML = '';
         document.getElementById('empty-message').classList.add('hidden');
 
@@ -143,28 +142,31 @@
 
         const rawChoices = localStorage.getItem('backendChoices');
         console.log('原始 backendChoices:', rawChoices);
-        let choices = {};
+        let choices = [];
         try {
-          choices = rawChoices ? JSON.parse(rawChoices) : {};
+          choices = rawChoices ? JSON.parse(rawChoices) : [];
         } catch (e) {
           console.error('JSON 解析失敗:', e);
           throw new Error('數據格式無效，請清除後臺數據後重試');
         }
 
-        if (Object.keys(choices).length === 0) {
+        if (choices.length === 0) {
           document.getElementById('empty-message').classList.remove('hidden');
           return;
         }
 
-        for (const voter in choices) {
-          const data = choices[voter];
-          if (!data || !Array.isArray(data.preferences) || !data.timestamp) {
-            console.warn(`無效數據: ${voter}`, data);
+        // 按時間排序（最新在上）
+        choices.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+        for (const data of choices) {
+          if (!data || !data.voter || !Array.isArray(data.preferences) || !data.timestamp || !data.round) {
+            console.warn('無效數據:', data);
             continue;
           }
           const row = document.createElement('tr');
           row.innerHTML = `
-            <td>${voter}</td>
+            <td>${data.round}</td>
+            <td>${data.voter}</td>
             <td>${data.preferences.join(' > ')}</td>
             <td>${data.timestamp}</td>
           `;
@@ -186,17 +188,16 @@
       try {
         if (!storageAvailable) throw new Error('本地儲存不可用');
         const rawChoices = localStorage.getItem('backendChoices');
-        let choices = rawChoices ? JSON.parse(rawChoices) : {};
-        let csv = '名稱,志願序,提交時間\n';
-        for (const voter in choices) {
-          const data = choices[voter];
-          if (!data || !Array.isArray(data.preferences) || !data.timestamp) {
-            console.warn(`無效數據: ${voter}`, data);
+        let choices = rawChoices ? JSON.parse(rawChoices) : [];
+        let csv = '輪次,名稱,志願序,提交時間\n';
+        for (const data of choices) {
+          if (!data || !data.voter || !Array.isArray(data.preferences) || !data.timestamp || !data.round) {
+            console.warn('無效數據:', data);
             continue;
           }
-          csv += `${voter},"${data.preferences.join(' > ')}","${data.timestamp}"\n`;
+          csv += `${data.round},${data.voter},"${data.preferences.join(' > ')}","${data.timestamp}"\n`;
         }
-        if (csv === '名稱,志願序,提交時間\n') {
+        if (csv === '輪次,名稱,志願序,提交時間\n') {
           alert('無數據可下載！');
           return;
         }
@@ -217,7 +218,7 @@
     function clearBackendData() {
       try {
         if (!storageAvailable) throw new Error('本地儲存不可用');
-        if (confirm('確定清除所有後臺數據？此操作無法復原！')) {
+        if (confirm('確定清除所有後臺數據？此操作將移除所有輪次記錄，無法復原！')) {
           localStorage.removeItem('backendChoices');
           alert('後臺數據已清除！');
           loadSubmissions();
