@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-  <title>匿名志願序配對</title>
+  <title>匿名配對</title>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <style>
@@ -144,7 +144,7 @@
 </head>
 <body>
   <div class="container">
-    <h2>匿名志願序配對</h2>
+    <h2>匿名志願序配對 - 第 <span id="round-display">1</span> 輪</h2>
     <div id="input-section">
       <label>您的名稱</label>
       <select id="voter"></select>
@@ -194,6 +194,18 @@
       localStorage.setItem('currentRound', currentRound.toString());
     }
     console.log('初始 choices:', choices, '輪次:', currentRound);
+
+    // 更新輪次顯示
+    function updateRoundDisplay() {
+      try {
+        const roundDisplay = document.getElementById('round-display');
+        if (roundDisplay) {
+          roundDisplay.textContent = currentRound;
+        }
+      } catch (e) {
+        console.error('updateRoundDisplay 錯誤:', e);
+      }
+    }
 
     // 更新“您的名稱”下拉選單
     function updateVoterOptions() {
@@ -356,6 +368,7 @@
         updateVoterOptions();
         updateProgress();
         updateSubmissionStatus();
+        updateRoundDisplay();
         document.getElementById('voter').addEventListener('change', updateSortableOptions);
       } catch (e) {
         document.getElementById('error-message').textContent = '頁面初始化失敗：' + e.message;
@@ -399,7 +412,7 @@
             localStorage.setItem('choices', JSON.stringify(choices));
             // 儲存到後臺 backendChoices（陣列）
             let backendChoices = JSON.parse(localStorage.getItem('backendChoices') || '[]');
-            const submissionId = Date.now().toString(); // 唯一ID
+            const submissionId = Date.now().toString();
             backendChoices.push({
               id: submissionId,
               voter: voter,
@@ -512,7 +525,7 @@
           localStorage.setItem('currentRound', currentRound.toString());
         }
         choices = {};
-        alert(`前臺數據已清除！進入第 ${currentRound} 輪，後臺數據保留。`);
+        alert(`數據已清除！開始第 ${currentRound} 輪。`);
         location.reload();
       } catch (e) {
         alert('清除數據失敗：' + e.message);
