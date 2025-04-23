@@ -125,16 +125,18 @@
   </div>
 
   <script>
-    // 初始化Firebase（請替換為您的真實配置）
+    // 初始化Firebase
     const firebaseConfig = {
-  apiKey: "AIzaSyBLfcslM75UhnihuxW5F8i7ou0ynXZr_Fo",
-  authDomain: "match-app-94e93.firebaseapp.com",
-  databaseURL: "https://match-app-94e93-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "match-app-94e93",
-  storageBucket: "match-app-94e93.firebasestorage.app",
-  messagingSenderId: "623667835812",
-  appId: "1:623667835812:web:cda4b3d75a920985020731"
-};
+      apiKey: "AIzaSyBLfcslM75UhnihuxW5F8i7ou0ynXZr_Fo",
+      authDomain: "match-app-94e93.firebaseapp.com",
+      databaseURL: "https://match-app-94e93-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "match-app-94e93",
+      storageBucket: "match-app-94e93.firebasestorage.app",
+      messagingSenderId: "623667835812",
+      appId: "1:623667835812:web:cda4b3d75a920985020731"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
 
     // 密碼保護
     const correctPassword = "match2025"; // 可自行更改
