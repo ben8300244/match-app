@@ -4,9 +4,6 @@
   <title>志願序配對後臺</title>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <!-- Firebase SDK -->
-  <script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"></script>
-  <script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js"></script>
   <style>
     body {
       font-family: 'Microsoft YaHei', -apple-system, Arial, sans-serif;
@@ -109,55 +106,34 @@
   </div>
 
   <script>
-    // 初始化Firebase
-    const firebaseConfig = {
-      apiKey: "AIzaSyBLfcslM75UhnihuxW5F8i7ou0ynXZr_Fo",
-      authDomain: "match-app-94e93.firebaseapp.com",
-      databaseURL: "https://match-app-94e93-default-rtdb.asia-southeast1.firebasedatabase.app",
-      projectId: "match-app-94e93",
-      storageBucket: "match-app-94e93.appspot.com",
-      messagingSenderId: "623667835812",
-      appId: "1:623667835812:web:cda4b3d75a920985020731"
-    };
-
-    let db = null;
-    window.addEventListener('load', () => {
-      if (typeof firebase !== 'undefined') {
-        try {
-          firebase.initializeApp(firebaseConfig);
-          db = firebase.database();
-          console.log('Firebase 初始化成功');
-          loadSubmissions();
-        } catch (e) {
-          document.getElementById('error').textContent = 'Firebase 初始化失敗：' + e.message;
-          document.getElementById('error').classList.remove('hidden');
-          console.error('Firebase 初始化錯誤:', e);
-        }
-      } else {
-        document.getElementById('error').textContent = '無法載入Firebase SDK，請檢查網絡！';
-        document.getElementById('error').classList.remove('hidden');
-        console.warn('Firebase SDK 未載入');
-      }
-    });
+    // 檢查localStorage可用性
+    let storageAvailable = true;
+    try {
+      localStorage.setItem('test', 'test');
+      localStorage.removeItem('test');
+    } catch (e) {
+      storageAvailable = false;
+      document.getElementById('error').textContent = '無法使用本地儲存，請檢查瀏覽器設置！';
+      document.getElementById('error').classList.remove('hidden');
+      console.warn('localStorage 不可用:', e);
+    }
 
     // 載入志願序數據
     function loadSubmissions() {
       try {
-        if (!db) throw new Error('Firebase 資料庫未初始化');
-        db.ref('submissions').on('value', (snapshot) => {
-          const submissions = snapshot.val() || {};
-          const tbody = document.getElementById('submissions').querySelector('tbody');
-          tbody.innerHTML = '';
-          for (const voter in submissions) {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-              <td>${voter}</td>
-              <td>${submissions[voter].preferences.join(' > ')}</td>
-              <td>${submissions[voter].timestamp}</td>
-            `;
-            tbody.appendChild(row);
-          }
-        });
+        if (!storageAvailable) throw new Error('本地儲存不可用');
+        const choices = JSON.parse(localStorage.getItem('choices') || '{}');
+        const tbody = document.getElementById('submissions').querySelector('tbody');
+        tbody.innerHTML = '';
+        for (const voter in choices) {
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td>${voter}</td>
+            <td>${choices[voter].preferences.join(' > ')}</td>
+            <td>${choices[voter].timestamp}</td>
+          `;
+          tbody.appendChild(row);
+        }
       } catch (e) {
         document.getElementById('error').textContent = '載入數據失敗：' + e.message;
         document.getElementById('error').classList.remove('hidden');
@@ -168,21 +144,19 @@
     // 下載CSV
     function downloadCSV() {
       try {
-        if (!db) throw new Error('Firebase 資料庫未初始化');
-        db.ref('submissions').once('value', (snapshot) => {
-          const submissions = snapshot.val() || {};
-          let csv = '名稱,志願序,提交時間\n';
-          for (const voter in submissions) {
-            csv += `${voter},"${submissions[voter].preferences.join(' > ')}","${submissions[voter].timestamp}"\n`;
-          }
-          const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = 'submissions.csv';
-          a.click();
-          URL.revokeObjectURL(url);
-        });
+        if (!storageAvailable) throw new Error('本地儲存不可用');
+        const choices = JSON.parse(localStorage.getItem('choices') || '{}');
+        let csv = '名稱,志願序,提交時間\n';
+        for (const voter in choices) {
+          csv += `${voter},"${choices[voter].preferences.join(' > ')}","${choices[voter].timestamp}"\n`;
+        }
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'submissions.csv';
+        a.click();
+        URL.revokeObjectURL(url);
       } catch (e) {
         alert('下載CSV失敗：' + e.message);
         console.error('downloadCSV 錯誤:', e);
@@ -192,21 +166,22 @@
     // 清除後臺數據
     function clearBackendData() {
       try {
-        if (!db) throw new Error('Firebase 資料庫未初始化');
+        if (!storageAvailable) throw new Error('本地儲存不可用');
         if (confirm('確定清除所有後臺數據？此操作無法復原！')) {
-          db.ref('submissions').remove((error) => {
-            if (error) {
-              alert('清除數據失敗，請檢查網絡！');
-            } else {
-              alert('後臺數據已清除！');
-            }
-          });
+          localStorage.removeItem('choices');
+          alert('後臺數據已清除！');
+          loadSubmissions();
         }
       } catch (e) {
         alert('清除數據失敗：' + e.message);
         console.error('clearBackendData 錯誤:', e);
       }
     }
+
+    // 初始化
+    window.addEventListener('load', () => {
+      loadSubmissions();
+    });
   </script>
 </body>
 </html>
