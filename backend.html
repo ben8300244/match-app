@@ -5,8 +5,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <!-- Firebase SDK -->
-  <script defer src="https://cdn.jsdelivr.net/npm/firebase@10.12.2/firebase-app.js"></script>
-  <script defer src="https://cdn.jsdelivr.net/npm/firebase@10.12.2/firebase-database.js"></script>
+  <script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"></script>
+  <script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js"></script>
   <style>
     body {
       font-family: 'Microsoft YaHei', -apple-system, Arial, sans-serif;
@@ -115,28 +115,30 @@
       authDomain: "match-app-94e93.firebaseapp.com",
       databaseURL: "https://match-app-94e93-default-rtdb.asia-southeast1.firebasedatabase.app",
       projectId: "match-app-94e93",
-      storageBucket: "match-app-94e93.firebasestorage.app",
+      storageBucket: "match-app-94e93.appspot.com",
       messagingSenderId: "623667835812",
       appId: "1:623667835812:web:cda4b3d75a920985020731"
     };
 
     let db = null;
-    if (typeof firebase !== 'undefined') {
-      try {
-        firebase.initializeApp(firebaseConfig);
-        db = firebase.database();
-        console.log('Firebase 初始化成功');
-        loadSubmissions();
-      } catch (e) {
-        document.getElementById('error').textContent = 'Firebase 初始化失敗：' + e.message;
+    window.addEventListener('load', () => {
+      if (typeof firebase !== 'undefined') {
+        try {
+          firebase.initializeApp(firebaseConfig);
+          db = firebase.database();
+          console.log('Firebase 初始化成功');
+          loadSubmissions();
+        } catch (e) {
+          document.getElementById('error').textContent = 'Firebase 初始化失敗：' + e.message;
+          document.getElementById('error').classList.remove('hidden');
+          console.error('Firebase 初始化錯誤:', e);
+        }
+      } else {
+        document.getElementById('error').textContent = '無法載入Firebase SDK，請檢查網絡！';
         document.getElementById('error').classList.remove('hidden');
-        console.error('Firebase 初始化錯誤:', e);
+        console.warn('Firebase SDK 未載入');
       }
-    } else {
-      document.getElementById('error').textContent = '無法載入Firebase SDK，請檢查網絡！';
-      document.getElementById('error').classList.remove('hidden');
-      console.warn('Firebase SDK 未載入');
-    }
+    });
 
     // 載入志願序數據
     function loadSubmissions() {

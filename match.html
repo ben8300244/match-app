@@ -5,8 +5,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <!-- Firebase SDK -->
-  <script defer src="https://cdn.jsdelivr.net/npm/firebase@10.12.2/firebase-app.js"></script>
-  <script defer src="https://cdn.jsdelivr.net/npm/firebase@10.12.2/firebase-database.js"></script>
+  <script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"></script>
+  <script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js"></script>
   <style>
     body {
       font-family: 'Microsoft YaHei', -apple-system, Arial, sans-serif;
@@ -51,7 +51,7 @@
       box-sizing: border-box;
       -webkit-appearance: none;
       background: #fff;
-      display: block;
+      display: block !important;
     }
     select:focus {
       border-color: #2ECC71;
@@ -111,7 +111,7 @@
       min-height: 50px;
       border: 2px dashed #4A90E2;
       border-radius: 8px;
-      display: block;
+      display: block !important;
     }
     .sortable li {
       background: #f0f8ff;
@@ -180,21 +180,24 @@
     };
 
     // 初始化Firebase
-    if (typeof firebase !== 'undefined') {
-      try {
-        firebase.initializeApp(firebaseConfig);
-        db = firebase.database();
-        console.log('Firebase 初始化成功');
-      } catch (e) {
-        document.getElementById('error-message').textContent = 'Firebase 初始化失敗：' + e.message;
+    window.addEventListener('load', () => {
+      if (typeof firebase !== 'undefined') {
+        try {
+          firebase.initializeApp(firebaseConfig);
+          db = firebase.database();
+          console.log('Firebase 初始化成功');
+        } catch (e) {
+          document.getElementById('error-message').textContent = 'Firebase 初始化失敗：' + e.message;
+          document.getElementById('error-message').classList.remove('hidden');
+          console.error('Firebase 初始化錯誤:', e);
+        }
+      } else {
+        document.getElementById('error-message').textContent = '無法載入Firebase SDK，選單仍可使用！';
         document.getElementById('error-message').classList.remove('hidden');
-        console.error('Firebase 初始化錯誤:', e);
+        console.warn('Firebase SDK 未載入');
       }
-    } else {
-      document.getElementById('error-message').textContent = '無法載入Firebase SDK，請檢查網絡！';
-      document.getElementById('error-message').classList.remove('hidden');
-      console.warn('Firebase SDK 未載入');
-    }
+      initializePage(); // 無論Firebase是否成功，都初始化頁面
+    });
 
     // 檢查localStorage可用性
     let storageAvailable = true;
@@ -383,17 +386,19 @@
       }
     }
 
-    // 初始化
-    try {
-      console.log('開始初始化頁面');
-      updateVoterOptions();
-      updateProgress();
-      updateSubmissionStatus();
-      document.getElementById('voter').addEventListener('change', updateSortableOptions);
-    } catch (e) {
-      document.getElementById('error-message').textContent = '頁面初始化失敗：' + e.message;
-      document.getElementById('error-message').classList.remove('hidden');
-      console.error('初始化錯誤:', e);
+    // 初始化頁面
+    function initializePage() {
+      try {
+        console.log('開始初始化頁面');
+        updateVoterOptions();
+        updateProgress();
+        updateSubmissionStatus();
+        document.getElementById('voter').addEventListener('change', updateSortableOptions);
+      } catch (e) {
+        document.getElementById('error-message').textContent = '頁面初始化失敗：' + e.message;
+        document.getElementById('error-message').classList.remove('hidden');
+        console.error('初始化錯誤:', e);
+      }
     }
 
     // 提交選擇
