@@ -4,6 +4,9 @@
   <title>匿名志願序配對</title>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js"></script>
   <style>
     body {
       font-family: 'Microsoft YaHei', -apple-system, Arial, sans-serif;
@@ -48,7 +51,7 @@
       box-sizing: border-box;
       -webkit-appearance: none;
       background: #fff;
-      display: block !important;
+      display: block;
     }
     select:focus {
       border-color: #2ECC71;
@@ -108,7 +111,7 @@
       min-height: 50px;
       border: 2px dashed #4A90E2;
       border-radius: 8px;
-      display: block !important;
+      display: block;
     }
     .sortable li {
       background: #f0f8ff;
@@ -164,6 +167,33 @@
   </div>
 
   <script>
+    // 初始化Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyBLfcslM75UhnihuxW5F8i7ou0ynXZr_Fo",
+      authDomain: "match-app-94e93.firebaseapp.com",
+      databaseURL: "https://match-app-94e93-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "match-app-94e93",
+      storageBucket: "match-app-94e93.firebasestorage.app",
+      messagingSenderId: "623667835812",
+      appId: "1:623667835812:web:cda4b3d75a920985020731"
+    };
+
+    // 檢查Firebase SDK是否載入
+    if (typeof firebase === 'undefined') {
+      document.getElementById('error-message').textContent = '無法載入Firebase，請檢查網絡！';
+      document.getElementById('error-message').classList.remove('hidden');
+    } else {
+      try {
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+        console.log('Firebase 初始化成功');
+      } catch (e) {
+        document.getElementById('error-message').textContent = 'Firebase 初始化失敗：' + e.message;
+        document.getElementById('error-message').classList.remove('hidden');
+        console.error('Firebase 初始化錯誤:', e);
+      }
+    }
+
     // 檢查localStorage可用性
     let storageAvailable = true;
     try {
@@ -171,7 +201,7 @@
       localStorage.removeItem('test');
     } catch (e) {
       storageAvailable = false;
-      document.getElementById('error-message').textContent = '無法使用本地儲存，請檢查瀏覽器設置！';
+      document.getElementById('error-message').textContent = '無法使用本地儲存，數據將儲存在記憶體中！';
       document.getElementById('error-message').classList.remove('hidden');
       console.warn('localStorage 不可用:', e);
     }
@@ -351,20 +381,18 @@
       }
     }
 
-    // 初始化頁面
-    window.addEventListener('load', () => {
-      try {
-        console.log('開始初始化頁面');
-        updateVoterOptions();
-        updateProgress();
-        updateSubmissionStatus();
-        document.getElementById('voter').addEventListener('change', updateSortableOptions);
-      } catch (e) {
-        document.getElementById('error-message').textContent = '頁面初始化失敗：' + e.message;
-        document.getElementById('error-message').classList.remove('hidden');
-        console.error('初始化錯誤:', e);
-      }
-    });
+    // 初始化
+    try {
+      console.log('開始初始化頁面');
+      updateVoterOptions();
+      updateProgress();
+      updateSubmissionStatus();
+      document.getElementById('voter').addEventListener('change', updateSortableOptions);
+    } catch (e) {
+      document.getElementById('error-message').textContent = '頁面初始化失敗：' + e.message;
+      document.getElementById('error-message').classList.remove('hidden');
+      console.error('初始化錯誤:', e);
+    }
 
     // 提交選擇
     function submitChoice() {
@@ -391,15 +419,28 @@
         }
 
         // 儲存到localStorage
-        const timestamp = new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' });
-        choices[voter] = { preferences: preferences, timestamp: timestamp };
+        choices[voter] = preferences;
         if (storageAvailable) {
           try {
             localStorage.setItem('choices', JSON.stringify(choices));
           } catch (e) {
-            alert('儲存數據失敗，請檢查瀏覽器設置！');
-            console.error('localStorage 儲存失敗:', e);
+            alert('儲存數據失敗，數據將儲存在記憶體中！');
           }
+        }
+
+        // 記錄到Firebase
+        const timestamp = new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' });
+        if (typeof firebase !== 'undefined' && db) {
+          db.ref('submissions/' + voter).set({
+            preferences: preferences,
+            timestamp: timestamp
+          }, (error) => {
+            if (error) {
+              alert('記錄志願序失敗，請檢查網絡！');
+            }
+          });
+        } else {
+          alert('Firebase 未初始化，數據僅儲存在本地！');
         }
 
         alert('提交成功！請下一個人輸入');
@@ -448,14 +489,8 @@
       const matches = [];
       const freeProposers = [...aGroup];
       const engagements = {};
-      const proposerRankings = {};
-      const acceptorRankings = {};
-
-      // 從choices提取志願序
-      for (const voter in choices) {
-        proposerRankings[voter] = choices[voter].preferences;
-        acceptorRankings[voter] = choices[voter].preferences;
-      }
+      const proposerRankings = {...choices};
+      const acceptorRankings = {...choices};
 
       const acceptorPriority = {};
       bGroup.forEach(b => {
@@ -497,6 +532,13 @@
       try {
         if (storageAvailable) {
           localStorage.removeItem('choices');
+        }
+        if (typeof firebase !== 'undefined' && db) {
+          db.ref('submissions').remove((error) => {
+            if (error) {
+              console.log('清除Firebase數據失敗:', error);
+            }
+          });
         }
         choices = {};
         alert('所有數據已清除！');
