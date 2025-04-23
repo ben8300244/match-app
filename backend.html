@@ -4,9 +4,6 @@
   <title>志願序配對後臺</title>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <!-- Firebase SDK -->
-  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js"></script>
   <style>
     body {
       font-family: 'Microsoft YaHei', -apple-system, Arial, sans-serif;
@@ -75,6 +72,11 @@
       font-size: 16px;
       margin: 10px 0;
     }
+    .empty {
+      color: #7F8C8D;
+      font-size: 16px;
+      margin: 20px 0;
+    }
     @media (max-width: 600px) {
       .container {
         padding: 15px;
@@ -102,6 +104,7 @@
         </thead>
         <tbody></tbody>
       </table>
+      <p id="empty-message" class="empty hidden">無提交數據</p>
       <button onclick="downloadCSV()">下載CSV</button>
       <button onclick="clearBackendData()">清除後臺數據</button>
     </div>
@@ -109,45 +112,68 @@
   </div>
 
   <script>
-    // 初始化Firebase
-    const firebaseConfig = {
-      apiKey: "AIzaSyBLfcslM75UhnihuxW5F8i7ou0ynXZr_Fo",
-      authDomain: "match-app-94e93.firebaseapp.com",
-      databaseURL: "https://match-app-94e93-default-rtdb.asia-southeast1.firebasedatabase.app",
-      projectId: "match-app-94e93",
-      storageBucket: "match-app-94e93.firebasestorage.app",
-      messagingSenderId: "623667835812",
-      appId: "1:623667835812:web:cda4b3d75a920985020731"
-    };
-
+    // 檢查localStorage可用性
+    let storageAvailable = true;
     try {
-      firebase.initializeApp(firebaseConfig);
-      const db = firebase.database();
-      console.log('Firebase 初始化成功');
-      loadSubmissions(); // 直接載入數據
+      localStorage.setItem('test', 'test');
+      localStorage.removeItem('test');
     } catch (e) {
-      document.getElementById('error').textContent = 'Firebase 初始化失敗：' + e.message;
+      storageAvailable = false;
+      document.getElementById('error').textContent = '無法使用本地儲存，請檢查瀏覽器設置（可能為隱私模式）！';
       document.getElementById('error').classList.remove('hidden');
-      console.error('Firebase 初始化錯誤:', e);
+      console.warn('localStorage 不可用:', e);
     }
 
     // 載入志願序數據
     function loadSubmissions() {
       try {
-        db.ref('submissions').on('value', (snapshot) => {
-          const submissions = snapshot.val() || {};
-          const tbody = document.getElementById('submissions').querySelector('tbody');
-          tbody.innerHTML = '';
-          for (const voter in submissions) {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-              <td>${voter}</td>
-              <td>${submissions[voter].preferences.join(' > ')}</td>
-              <td>${submissions[voter].timestamp}</td>
-            `;
-            tbody.appendChild(row);
+        console.log('開始載入數據');
+        const tbody = document.getElementById('submissions')?.querySelector('tbody');
+        if (!tbody) {
+          throw new Error('找不到表格元素');
+        }
+        tbody.innerHTML = '';
+        document.getElementById('empty-message').classList.add('hidden');
+
+        if (!storageAvailable) {
+          document.getElementById('empty-message').textContent = '本地儲存不可用，無法顯示數據';
+          document.getElementById('empty-message').classList.remove('hidden');
+          return;
+        }
+
+        const rawChoices = localStorage.getItem('backendChoices');
+        console.log('原始 backendChoices:', rawChoices);
+        let choices = {};
+        try {
+          choices = rawChoices ? JSON.parse(rawChoices) : {};
+        } catch (e) {
+          console.error('JSON 解析失敗:', e);
+          throw new Error('數據格式無效，請清除後臺數據後重試');
+        }
+
+        if (Object.keys(choices).length === 0) {
+          document.getElementById('empty-message').classList.remove('hidden');
+          return;
+        }
+
+        for (const voter in choices) {
+          const data = choices[voter];
+          if (!data || !Array.isArray(data.preferences) || !data.timestamp) {
+            console.warn(`無效數據: ${voter}`, data);
+            continue;
           }
-        });
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td>${voter}</td>
+            <td>${data.preferences.join(' > ')}</td>
+            <td>${data.timestamp}</td>
+          `;
+          tbody.appendChild(row);
+        }
+
+        if (tbody.children.length === 0) {
+          document.getElementById('empty-message').classList.remove('hidden');
+        }
       } catch (e) {
         document.getElementById('error').textContent = '載入數據失敗：' + e.message;
         document.getElementById('error').classList.remove('hidden');
@@ -158,20 +184,29 @@
     // 下載CSV
     function downloadCSV() {
       try {
-        db.ref('submissions').once('value', (snapshot) => {
-          const submissions = snapshot.val() || {};
-          let csv = '名稱,志願序,提交時間\n';
-          for (const voter in submissions) {
-            csv += `${voter},"${submissions[voter].preferences.join(' > ')}","${submissions[voter].timestamp}"\n`;
+        if (!storageAvailable) throw new Error('本地儲存不可用');
+        const rawChoices = localStorage.getItem('backendChoices');
+        let choices = rawChoices ? JSON.parse(rawChoices) : {};
+        let csv = '名稱,志願序,提交時間\n';
+        for (const voter in choices) {
+          const data = choices[voter];
+          if (!data || !Array.isArray(data.preferences) || !data.timestamp) {
+            console.warn(`無效數據: ${voter}`, data);
+            continue;
           }
-          const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = 'submissions.csv';
-          a.click();
-          URL.revokeObjectURL(url);
-        });
+          csv += `${voter},"${data.preferences.join(' > ')}","${data.timestamp}"\n`;
+        }
+        if (csv === '名稱,志願序,提交時間\n') {
+          alert('無數據可下載！');
+          return;
+        }
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'submissions.csv';
+        a.click();
+        URL.revokeObjectURL(url);
       } catch (e) {
         alert('下載CSV失敗：' + e.message);
         console.error('downloadCSV 錯誤:', e);
@@ -181,20 +216,23 @@
     // 清除後臺數據
     function clearBackendData() {
       try {
+        if (!storageAvailable) throw new Error('本地儲存不可用');
         if (confirm('確定清除所有後臺數據？此操作無法復原！')) {
-          db.ref('submissions').remove((error) => {
-            if (error) {
-              alert('清除數據失敗，請檢查網絡！');
-            } else {
-              alert('後臺數據已清除！');
-            }
-          });
+          localStorage.removeItem('backendChoices');
+          alert('後臺數據已清除！');
+          loadSubmissions();
         }
       } catch (e) {
         alert('清除數據失敗：' + e.message);
         console.error('clearBackendData 錯誤:', e);
       }
     }
+
+    // 初始化
+    window.addEventListener('load', () => {
+      console.log('後臺頁面載入');
+      loadSubmissions();
+    });
   </script>
 </body>
 </html>
