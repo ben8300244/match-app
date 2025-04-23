@@ -73,15 +73,6 @@
     button:active {
       transform: scale(0.95);
     }
-    #result {
-      font-size: 18px;
-      color: #2ECC71;
-      margin: 15px 0;
-      line-height: 1.5;
-    }
-    #result.error {
-      color: #E74C3C;
-    }
     .progress, .status {
       color: #7F8C8D;
       font-size: 14px;
@@ -93,13 +84,6 @@
     }
     .hidden {
       display: none;
-    }
-    .fade-in {
-      animation: fadeIn 0.5s ease-in;
-    }
-    @keyframes fadeIn {
-      from { opacity: 0; }
-      to { opacity: 1; }
     }
     .sortable {
       list-style: none;
@@ -155,12 +139,6 @@
       <p class="status" id="submitted">已提交：無</p>
       <p class="status" id="not-submitted">未提交：小牛、小菊、八索、小燕、小ㄚ頭、艾莉、FIFI、雨呈</p>
     </div>
-    <div id="result-section" class="hidden">
-      <p id="result"></p>
-    </div>
-    <button id="check-button" class="hidden" onclick="showResults()">檢查結果</button>
-    <button onclick="clearData()">清除數據</button>
-    <button onclick="resetRound()">重置輪次</button>
     <p id="error-message" class="error-message hidden"></p>
   </div>
 
@@ -433,121 +411,11 @@
         updateProgress();
         updateSubmissionStatus();
         if (Object.keys(choices).length === 8) {
-          document.getElementById('input-section').style.display = 'none';
-          document.getElementById('check-button').classList.remove('hidden');
+          window.location.href = 'check.html';
         }
       } catch (e) {
         alert('提交失敗：' + e.message);
         console.error('submitChoice 錯誤:', e);
-      }
-    }
-
-    // Gale-Shapley算法
-    function showResults() {
-      try {
-        document.getElementById('input-section').style.display = 'none';
-        document.getElementById('check-button').classList.add('hidden');
-        document.getElementById('result-section').classList.remove('hidden');
-        const result = document.getElementById('result');
-        result.classList.add('fade-in');
-
-        const matches = galeShapley();
-        if (matches.length === 0) {
-          result.textContent = '無任何配對成功。';
-          result.classList.add('error');
-        } else {
-          const matchesText = '配對成功：' + matches.map(m => `${m[0]} 與 ${m[1]}`).join('，');
-          result.textContent = matchesText;
-          navigator.clipboard.writeText(matchesText).then(() => {
-            alert('結果已複製到剪貼簿，請貼到備忘錄！');
-          }).catch(() => {
-            alert('複製失敗，請手動複製結果！');
-          });
-        }
-      } catch (e) {
-        alert('顯示結果失敗：' + e.message);
-        console.error('showResults 錯誤:', e);
-      }
-    }
-
-    function galeShapley() {
-      const matches = [];
-      const freeProposers = [...aGroup];
-      const engagements = {};
-      const proposerRankings = {};
-      const acceptorRankings = {};
-
-      for (const voter in choices) {
-        proposerRankings[voter] = choices[voter].preferences;
-        acceptorRankings[voter] = choices[voter].preferences;
-      }
-
-      const acceptorPriority = {};
-      bGroup.forEach(b => {
-        acceptorPriority[b] = {};
-        acceptorRankings[b].forEach((a, index) => {
-          acceptorPriority[b][a] = index;
-        });
-      });
-
-      while (freeProposers.length > 0) {
-        const proposer = freeProposers[0];
-        const preferences = proposerRankings[proposer];
-        if (!preferences || preferences.length === 0) {
-          freeProposers.shift();
-          continue;
-        }
-        const acceptor = preferences.shift();
-        if (!engagements[acceptor]) {
-          engagements[acceptor] = proposer;
-          freeProposers.shift();
-        } else {
-          const currentProposer = engagements[acceptor];
-          if (acceptorPriority[acceptor][proposer] < acceptorPriority[acceptor][currentProposer]) {
-            engagements[acceptor] = proposer;
-            freeProposers.shift();
-            freeProposers.push(currentProposer);
-          }
-        }
-      }
-
-      for (const acceptor in engagements) {
-        matches.push([engagements[acceptor], acceptor]);
-      }
-      return matches.sort((a, b) => voters.indexOf(a[0]) - voters.indexOf(b[0]));
-    }
-
-    // 清除數據（僅前臺，遞增輪次）
-    function clearData() {
-      try {
-        if (storageAvailable) {
-          localStorage.removeItem('choices');
-          currentRound++;
-          localStorage.setItem('currentRound', currentRound.toString());
-        }
-        choices = {};
-        alert(`數據已清除！開始第 ${currentRound} 輪。`);
-        location.reload();
-      } catch (e) {
-        alert('清除數據失敗：' + e.message);
-        console.error('clearData 錯誤:', e);
-      }
-    }
-
-    // 重置輪次
-    function resetRound() {
-      try {
-        if (storageAvailable) {
-          localStorage.removeItem('choices');
-          currentRound = 1;
-          localStorage.setItem('currentRound', currentRound.toString());
-        }
-        choices = {};
-        alert(`輪次已重置！開始第 ${currentRound} 輪。`);
-        location.reload();
-      } catch (e) {
-        alert('重置輪次失敗：' + e.message);
-        console.error('resetRound 錯誤:', e);
       }
     }
   </script>

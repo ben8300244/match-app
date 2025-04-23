@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <title>配對結果</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <style>
+    body {
+      font-family: 'Microsoft YaHei', -apple-system, Arial, sans-serif;
+      background: linear-gradient(135deg, #e0eafc, #cfdef3);
+      margin: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      color: #333;
+      font-size: 16px;
+    }
+    .container {
+      background: #fff;
+      border-radius: 15px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+      padding: 20px;
+      width: 90vw;
+      max-width: 400px;
+      text-align: center;
+      box-sizing: border-box;
+    }
+    h2 {
+      color: #4A90E2;
+      margin-bottom: 15px;
+      font-size: 24px;
+    }
+    button {
+      background: #4A90E2;
+      color: #fff;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: transform 0.2s, background 0.3s;
+      margin: 10px;
+      touch-action: manipulation;
+    }
+    button:hover {
+      background: #357ABD;
+      transform: scale(1.05);
+    }
+    button:active {
+      transform: scale(0.95);
+    }
+    #result {
+      font-size: 18px;
+      color: #2ECC71;
+      margin: 15px 0;
+      line-height: 1.5;
+    }
+    #result.error {
+      color: #E74C3C;
+    }
+    .error-message {
+      color: #E74C3C;
+      font-size: 14px;
+      margin: 10px 0;
+    }
+    .fade-in {
+      animation: fadeIn 0.5s ease-in;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    @media (max-width: 600px) {
+      .container {
+        padding: 15px;
+      }
+      h2 {
+        font-size: 22px;
+      }
+      button {
+        padding: 10px 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>配對結果 - 第 <span id="round-display">1</span> 輪</h2>
+    <div id="result-section">
+      <p id="result"></p>
+    </div>
+    <button onclick="nextRound()">進行下一輪</button>
+    <p id="error-message" class="error-message hidden"></p>
+  </div>
+
+  <script>
+    // 檢查localStorage可用性
+    let storageAvailable = true;
+    try {
+      localStorage.setItem('test', 'test');
+      localStorage.removeItem('test');
+    } catch (e) {
+      storageAvailable = false;
+      document.getElementById('error-message').textContent = '無法使用本地儲存，請檢查瀏覽器設置！';
+      document.getElementById('error-message').classList.remove('hidden');
+      console.warn('localStorage 不可用:', e);
+    }
+
+    // 初始化數據
+    let choices = storageAvailable ? JSON.parse(localStorage.getItem('choices') || '{}') : {};
+    let currentRound = storageAvailable ? parseInt(localStorage.getItem('currentRound') || '1') : 1;
+    const voters = ['小牛', '小菊', '八索', '小燕', '小ㄚ頭', '艾莉', 'FIFI', '雨呈'];
+    const aGroup = ['小牛', '小菊', '八索', '小燕'];
+    const bGroup = ['小ㄚ頭', '艾莉', 'FIFI', '雨呈'];
+
+    // 更新輪次顯示
+    function updateRoundDisplay() {
+      try {
+        const roundDisplay = document.getElementById('round-display');
+        if (roundDisplay) {
+          roundDisplay.textContent = currentRound;
+        }
+      } catch (e) {
+        console.error('updateRoundDisplay 錯誤:', e);
+      }
+    }
+
+    // Gale-Shapley算法
+    function galeShapley() {
+      const matches = [];
+      const freeProposers = [...aGroup];
+      const engagements = {};
+      const proposerRankings = {};
+      const acceptorRankings = {};
+
+      for (const voter in choices) {
+        proposerRankings[voter] = choices[voter].preferences;
+        acceptorRankings[voter] = choices[voter].preferences;
+      }
+
+      const acceptorPriority = {};
+      bGroup.forEach(b => {
+        acceptorPriority[b] = {};
+        acceptorRankings[b].forEach((a, index) => {
+          acceptorPriority[b][a] = index;
+        });
+      });
+
+      while (freeProposers.length > 0) {
+        const proposer = freeProposers[0];
+        const preferences = proposerRankings[proposer];
+        if (!preferences || preferences.length === 0) {
+          freeProposers.shift();
+          continue;
+        }
+        const acceptor = preferences.shift();
+        if (!engagements[acceptor]) {
+          engagements[acceptor] = proposer;
+          freeProposers.shift();
+        } else {
+          const currentProposer = engagements[acceptor];
+          if (acceptorPriority[acceptor][proposer] < acceptorPriority[acceptor][currentProposer]) {
+            engagements[acceptor] = proposer;
+            freeProposers.shift();
+            freeProposers.push(currentProposer);
+          }
+        }
+      }
+
+      for (const acceptor in engagements) {
+        matches.push([engagements[acceptor], acceptor]);
+      }
+      return matches.sort((a, b) => voters.indexOf(a[0]) - voters.indexOf(b[0]));
+    }
+
+    // 顯示結果
+    function displayResults() {
+      try {
+        const result = document.getElementById('result');
+        result.classList.add('fade-in');
+
+        const matches = galeShapley();
+        if (matches.length === 0) {
+          result.textContent = '無任何配對成功。';
+          result.classList.add('error');
+        } else {
+          const matchesText = '配對成功：' + matches.map(m => `${m[0]} 與 ${m[1]}`).join('，');
+          result.textContent = matchesText;
+        }
+      } catch (e) {
+        document.getElementById('error-message').textContent = '顯示結果失敗：' + e.message;
+        document.getElementById('error-message').classList.remove('hidden');
+        console.error('displayResults 錯誤:', e);
+      }
+    }
+
+    // 進行下一輪
+    function nextRound() {
+      try {
+        if (storageAvailable) {
+          localStorage.removeItem('choices');
+          currentRound++;
+          localStorage.setItem('currentRound', currentRound.toString());
+        }
+        window.location.href = 'index.html';
+      } catch (e) {
+        alert('開始下一輪失敗：' + e.message);
+        console.error('nextRound 錯誤:', e);
+      }
+    }
+
+    // 初始化頁面
+    window.addEventListener('load', () => {
+      try {
+        console.log('開始初始化結果頁面');
+        updateRoundDisplay();
+        displayResults();
+      } catch (e) {
+        document.getElementById('error-message').textContent = '頁面初始化失敗：' + e.message;
+        document.getElementById('error-message').classList.remove('hidden');
+        console.error('初始化錯誤:', e);
+      }
+    });
+  </script>
+</body>
+</html>
