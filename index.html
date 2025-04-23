@@ -46,7 +46,6 @@
       font-size: 16px;
       margin-bottom: 15px;
       box-sizing: border-box;
-      -webkit-appearance: none;
       background: #fff;
       display: block !important;
     }
@@ -150,14 +149,24 @@
       localStorage.removeItem('test');
     } catch (e) {
       storageAvailable = false;
-      document.getElementById('error-message').textContent = '無法使用本地儲存，請檢查瀏覽器設置！';
+      document.getElementById('error-message').textContent = '無法使用本地儲存，請檢查瀏覽器設置或退出隱私模式！';
       document.getElementById('error-message').classList.remove('hidden');
       console.warn('localStorage 不可用:', e);
     }
 
     // 初始化數據
-    let choices = storageAvailable ? JSON.parse(localStorage.getItem('choices') || '{}') : {};
-    let currentRound = storageAvailable ? parseInt(localStorage.getItem('currentRound') || '1') : 1;
+    let choices = {};
+    let currentRound = 1;
+    if (storageAvailable) {
+      try {
+        choices = JSON.parse(localStorage.getItem('choices') || '{}');
+        currentRound = parseInt(localStorage.getItem('currentRound') || '1');
+      } catch (e) {
+        console.error('localStorage 解析失敗:', e);
+        document.getElementById('error-message').textContent = '數據載入失敗，請清除瀏覽器快取！';
+        document.getElementById('error-message').classList.remove('hidden');
+      }
+    }
     const voters = ['小牛', '小菊', '八索', '小燕', '小ㄚ頭', '艾莉', 'FIFI', '雨呈'];
     const aGroup = ['小牛', '小菊', '八索', '小燕'];
     const bGroup = ['小ㄚ頭', '艾莉', 'FIFI', '雨呈'];
@@ -169,8 +178,12 @@
       }
     }
     if (storageAvailable) {
-      localStorage.setItem('choices', JSON.stringify(choices));
-      localStorage.setItem('currentRound', currentRound.toString());
+      try {
+        localStorage.setItem('choices', JSON.stringify(choices));
+        localStorage.setItem('currentRound', currentRound.toString());
+      } catch (e) {
+        console.warn('localStorage 儲存失敗:', e);
+      }
     }
     console.log('初始 choices:', choices, '輪次:', currentRound);
 
@@ -180,6 +193,8 @@
         const roundDisplay = document.getElementById('round-display');
         if (roundDisplay) {
           roundDisplay.textContent = currentRound;
+        } else {
+          console.error('找不到 round-display 元素');
         }
       } catch (e) {
         console.error('updateRoundDisplay 錯誤:', e);
@@ -190,9 +205,11 @@
     function updateVoterOptions() {
       try {
         const voterSelect = document.getElementById('voter');
-        if (!voterSelect) throw new Error('找不到 voter 元素');
+        if (!voterSelect) {
+          throw new Error('找不到 voter 元素');
+        }
         voterSelect.innerHTML = '';
-        const notSubmitted = voters.filter(v => !choices[v]);
+        const notSubmitted = voters.filter(v => !choices[v] || !choices[v].preferences);
         console.log('未提交者:', notSubmitted);
 
         if (notSubmitted.length === 0) {
@@ -201,7 +218,15 @@
           option.text = '無可選名稱';
           voterSelect.appendChild(option);
           voterSelect.disabled = true;
+          console.log('選單禁用：無可選名稱');
         } else {
+          const defaultOption = document.createElement('option');
+          defaultOption.value = '';
+          defaultOption.text = '請選擇名稱';
+          defaultOption.disabled = true;
+          defaultOption.selected = true;
+          voterSelect.appendChild(defaultOption);
+
           notSubmitted.forEach(voter => {
             const option = document.createElement('option');
             option.value = voter;
@@ -209,6 +234,7 @@
             voterSelect.appendChild(option);
           });
           voterSelect.disabled = false;
+          console.log('選單填充:', notSubmitted);
         }
         updateSortableOptions();
       } catch (e) {
@@ -229,6 +255,7 @@
           const li = document.createElement('li');
           li.textContent = '請先選擇您的名稱';
           sortable.appendChild(li);
+          console.log('拖曳區域：請選擇名稱');
           return;
         }
         const options = aGroup.includes(voter) ? bGroup : aGroup;
@@ -348,7 +375,15 @@
         updateProgress();
         updateSubmissionStatus();
         updateRoundDisplay();
-        document.getElementById('voter').addEventListener('change', updateSortableOptions);
+        const voterSelect = document.getElementById('voter');
+        if (voterSelect) {
+          voterSelect.addEventListener('change', () => {
+            console.log('名稱選擇:', voterSelect.value);
+            updateSortableOptions();
+          });
+        } else {
+          console.error('找不到 voter 元素，無法綁定 change 事件');
+        }
       } catch (e) {
         document.getElementById('error-message').textContent = '頁面初始化失敗：' + e.message;
         document.getElementById('error-message').classList.remove('hidden');
