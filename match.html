@@ -51,6 +51,7 @@
       box-sizing: border-box;
       -webkit-appearance: none;
       background: #fff;
+      display: block;
     }
     select:focus {
       border-color: #2ECC71;
@@ -110,6 +111,7 @@
       min-height: 50px;
       border: 2px dashed #4A90E2;
       border-radius: 8px;
+      display: block;
     }
     .sortable li {
       background: #f0f8ff;
@@ -124,6 +126,11 @@
     .sortable li.dragging {
       opacity: 0.5;
       background: #2ECC71;
+    }
+    .error-message {
+      color: #E74C3C;
+      font-size: 14px;
+      margin: 10px 0;
     }
     @media (max-width: 600px) {
       .container {
@@ -156,6 +163,7 @@
     </div>
     <button id="check-button" class="hidden" onclick="showResults()">檢查結果</button>
     <button onclick="clearData()">清除數據</button>
+    <p id="error-message" class="error-message hidden"></p>
   </div>
 
   <script>
@@ -169,8 +177,22 @@
       messagingSenderId: "623667835812",
       appId: "1:623667835812:web:cda4b3d75a920985020731"
     };
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
+
+    // 檢查Firebase SDK是否載入
+    if (typeof firebase === 'undefined') {
+      document.getElementById('error-message').textContent = '無法載入Firebase，請檢查網絡！';
+      document.getElementById('error-message').classList.remove('hidden');
+    } else {
+      try {
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+        console.log('Firebase 初始化成功');
+      } catch (e) {
+        document.getElementById('error-message').textContent = 'Firebase 初始化失敗：' + e.message;
+        document.getElementById('error-message').classList.remove('hidden');
+        console.error('Firebase 初始化錯誤:', e);
+      }
+    }
 
     // 檢查localStorage可用性
     let storageAvailable = true;
@@ -179,10 +201,12 @@
       localStorage.removeItem('test');
     } catch (e) {
       storageAvailable = false;
-      alert('無法使用本地儲存，數據將儲存在記憶體中！');
+      document.getElementById('error-message').textContent = '無法使用本地儲存，數據將儲存在記憶體中！';
+      document.getElementById('error-message').classList.remove('hidden');
+      console.warn('localStorage 不可用:', e);
     }
 
-    // 初始化choices
+    // 初始化數據
     let choices = storageAvailable ? JSON.parse(localStorage.getItem('choices') || '{}') : {};
     const voters = ['小牛', '小菊', '八索', '小燕', '小ㄚ頭', '艾莉', 'FIFI', '雨呈'];
     const aGroup = ['小牛', '小菊', '八索', '小燕'];
@@ -197,54 +221,76 @@
     if (storageAvailable) {
       localStorage.setItem('choices', JSON.stringify(choices));
     }
+    console.log('初始 choices:', choices);
 
     // 更新“您的名稱”下拉選單
     function updateVoterOptions() {
-      const voterSelect = document.getElementById('voter');
-      voterSelect.innerHTML = '';
-      const notSubmitted = voters.filter(v => !choices[v]);
-      if (notSubmitted.length === 0) {
-        const option = document.createElement('option');
-        option.value = '';
-        option.text = '無可選名稱';
-        voterSelect.appendChild(option);
-        voterSelect.disabled = true;
-      } else {
-        notSubmitted.forEach(voter => {
+      try {
+        const voterSelect = document.getElementById('voter');
+        if (!voterSelect) {
+          throw new Error('找不到 voter 元素');
+        }
+        voterSelect.innerHTML = '';
+        const notSubmitted = voters.filter(v => !choices[v]);
+        console.log('未提交者:', notSubmitted);
+
+        if (notSubmitted.length === 0) {
           const option = document.createElement('option');
-          option.value = voter;
-          option.text = voter;
+          option.value = '';
+          option.text = '無可選名稱';
           voterSelect.appendChild(option);
-        });
-        voterSelect.disabled = false;
+          voterSelect.disabled = true;
+        } else {
+          notSubmitted.forEach(voter => {
+            const option = document.createElement('option');
+            option.value = voter;
+            option.text = voter;
+            voterSelect.appendChild(option);
+          });
+          voterSelect.disabled = false;
+        }
+        updateSortableOptions();
+      } catch (e) {
+        document.getElementById('error-message').textContent = '初始化選單失敗：' + e.message;
+        document.getElementById('error-message').classList.remove('hidden');
+        console.error('updateVoterOptions 錯誤:', e);
       }
-      setTimeout(updateSortableOptions, 0);
     }
 
     // 更新拖曳排序選項
     function updateSortableOptions() {
-      const voter = document.getElementById('voter').value;
-      const sortable = document.getElementById('sortable');
-      sortable.innerHTML = '';
-      if (!voter || voter === '') {
-        const li = document.createElement('li');
-        li.textContent = '請先選擇您的名稱';
-        sortable.appendChild(li);
-        return;
+      try {
+        const voter = document.getElementById('voter').value;
+        const sortable = document.getElementById('sortable');
+        if (!sortable) {
+          throw new Error('找不到 sortable 元素');
+        }
+        sortable.innerHTML = '';
+        if (!voter || voter === '') {
+          const li = document.createElement('li');
+          li.textContent = '請先選擇您的名稱';
+          sortable.appendChild(li);
+          return;
+        }
+        const options = aGroup.includes(voter) ? bGroup : aGroup;
+        console.log('拖曳選項:', options);
+        options.forEach(opt => {
+          const li = document.createElement('li');
+          li.textContent = opt;
+          li.setAttribute('draggable', true);
+          li.addEventListener('dragstart', handleDragStart);
+          li.addEventListener('dragover', handleDragOver);
+          li.addEventListener('drop', handleDrop);
+          li.addEventListener('touchstart', handleTouchStart, { passive: false });
+          li.addEventListener('touchmove', handleTouchMove, { passive: false });
+          li.addEventListener('touchend', handleTouchEnd);
+          sortable.appendChild(li);
+        });
+      } catch (e) {
+        document.getElementById('error-message').textContent = '初始化拖曳清單失敗：' + e.message;
+        document.getElementById('error-message').classList.remove('hidden');
+        console.error('updateSortableOptions 錯誤:', e);
       }
-      const options = aGroup.includes(voter) ? bGroup : aGroup;
-      options.forEach(opt => {
-        const li = document.createElement('li');
-        li.textContent = opt;
-        li.setAttribute('draggable', true);
-        li.addEventListener('dragstart', handleDragStart);
-        li.addEventListener('dragover', handleDragOver);
-        li.addEventListener('drop', handleDrop);
-        li.addEventListener('touchstart', handleTouchStart, { passive: false });
-        li.addEventListener('touchmove', handleTouchMove, { passive: false });
-        li.addEventListener('touchend', handleTouchEnd);
-        sortable.appendChild(li);
-      });
     }
 
     // 拖曳事件處理
@@ -280,11 +326,14 @@
     function handleTouchStart(e) {
       e.preventDefault();
       touchItem = e.target.closest('li');
-      touchItem.classList.add('dragging');
-      touchStartY = e.touches[0].clientY;
+      if (touchItem) {
+        touchItem.classList.add('dragging');
+        touchStartY = e.touches[0].clientY;
+      }
     }
     function handleTouchMove(e) {
       e.preventDefault();
+      if (!touchItem) return;
       const touch = e.touches[0];
       const sortable = document.getElementById('sortable');
       const items = Array.from(sortable.children);
@@ -312,103 +361,127 @@
 
     // 更新進度顯示
     function updateProgress() {
-      const count = Math.min(Object.keys(choices).length, 8);
-      document.getElementById('progress').textContent = `已提交：${count}/8`;
+      try {
+        const count = Math.min(Object.keys(choices).length, 8);
+        document.getElementById('progress').textContent = `已提交：${count}/8`;
+      } catch (e) {
+        console.error('updateProgress 錯誤:', e);
+      }
     }
 
     // 更新提交狀態顯示
     function updateSubmissionStatus() {
-      const submitted = Object.keys(choices).filter(v => voters.includes(v));
-      const notSubmitted = voters.filter(v => !submitted.includes(v));
-      document.getElementById('submitted').innerHTML = `<strong>已提交：</strong>${submitted.length > 0 ? submitted.join('、') : '無'}`;
-      document.getElementById('not-submitted').innerHTML = `<strong>未提交：</strong>${notSubmitted.length > 0 ? notSubmitted.join('、') : '無'}`;
+      try {
+        const submitted = Object.keys(choices).filter(v => voters.includes(v));
+        const notSubmitted = voters.filter(v => !submitted.includes(v));
+        document.getElementById('submitted').innerHTML = `<strong>已提交：</strong>${submitted.length > 0 ? submitted.join('、') : '無'}`;
+        document.getElementById('not-submitted').innerHTML = `<strong>未提交：</strong>${notSubmitted.length > 0 ? notSubmitted.join('、') : '無'}`;
+      } catch (e) {
+        console.error('updateSubmissionStatus 錯誤:', e);
+      }
     }
 
     // 初始化
     try {
+      console.log('開始初始化頁面');
       updateVoterOptions();
       updateProgress();
       updateSubmissionStatus();
       document.getElementById('voter').addEventListener('change', updateSortableOptions);
     } catch (e) {
-      alert('初始化失敗，請重新載入頁面！錯誤：' + e.message);
+      document.getElementById('error-message').textContent = '頁面初始化失敗：' + e.message;
+      document.getElementById('error-message').classList.remove('hidden');
+      console.error('初始化錯誤:', e);
     }
 
     // 提交選擇
     function submitChoice() {
-      const voter = document.getElementById('voter').value;
-      const sortable = document.getElementById('sortable');
-      const preferences = Array.from(sortable.children).map(li => li.textContent);
-      if (!voter || preferences.length === 0 || !voters.includes(voter)) {
-        alert('請選擇有效名稱並完成志願序排序！');
-        return;
-      }
-      if (choices[voter]) {
-        alert('此名稱已提交，請勿重複提交！');
-        return;
-      }
-      if (Object.keys(choices).length >= 8) {
-        alert('已達8人提交上限，請檢查結果！');
-        return;
-      }
-      const expectedOptions = aGroup.includes(voter) ? bGroup : aGroup;
-      if (preferences.length !== expectedOptions.length || !preferences.every(p => expectedOptions.includes(p))) {
-        alert('志願序無效，請重新排序！');
-        return;
-      }
-
-      // 儲存到localStorage
-      choices[voter] = preferences;
-      if (storageAvailable) {
-        try {
-          localStorage.setItem('choices', JSON.stringify(choices));
-        } catch (e) {
-          alert('儲存數據失敗，數據將儲存在記憶體中！');
+      try {
+        const voter = document.getElementById('voter').value;
+        const sortable = document.getElementById('sortable');
+        const preferences = Array.from(sortable.children).map(li => li.textContent);
+        if (!voter || preferences.length === 0 || !voters.includes(voter)) {
+          alert('請選擇有效名稱並完成志願序排序！');
+          return;
         }
-      }
-
-      // 記錄到Firebase
-      const timestamp = new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' });
-      db.ref('submissions/' + voter).set({
-        preferences: preferences,
-        timestamp: timestamp
-      }, (error) => {
-        if (error) {
-          alert('記錄志願序失敗，請檢查網絡！');
+        if (choices[voter]) {
+          alert('此名稱已提交，請勿重複提交！');
+          return;
         }
-      });
+        if (Object.keys(choices).length >= 8) {
+          alert('已達8人提交上限，請檢查結果！');
+          return;
+        }
+        const expectedOptions = aGroup.includes(voter) ? bGroup : aGroup;
+        if (preferences.length !== expectedOptions.length || !preferences.every(p => expectedOptions.includes(p))) {
+          alert('志願序無效，請重新排序！');
+          return;
+        }
 
-      alert('提交成功！請下一個人輸入');
-      updateVoterOptions();
-      updateProgress();
-      updateSubmissionStatus();
-      if (Object.keys(choices).length === 8) {
-        document.getElementById('input-section').style.display = 'none';
-        document.getElementById('check-button').classList.remove('hidden');
+        // 儲存到localStorage
+        choices[voter] = preferences;
+        if (storageAvailable) {
+          try {
+            localStorage.setItem('choices', JSON.stringify(choices));
+          } catch (e) {
+            alert('儲存數據失敗，數據將儲存在記憶體中！');
+          }
+        }
+
+        // 記錄到Firebase
+        const timestamp = new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' });
+        if (typeof firebase !== 'undefined' && db) {
+          db.ref('submissions/' + voter).set({
+            preferences: preferences,
+            timestamp: timestamp
+          }, (error) => {
+            if (error) {
+              alert('記錄志願序失敗，請檢查網絡！');
+            }
+          });
+        } else {
+          alert('Firebase 未初始化，數據僅儲存在本地！');
+        }
+
+        alert('提交成功！請下一個人輸入');
+        updateVoterOptions();
+        updateProgress();
+        updateSubmissionStatus();
+        if (Object.keys(choices).length === 8) {
+          document.getElementById('input-section').style.display = 'none';
+          document.getElementById('check-button').classList.remove('hidden');
+        }
+      } catch (e) {
+        alert('提交失敗：' + e.message);
+        console.error('submitChoice 錯誤:', e);
       }
     }
 
     // Gale-Shapley算法計算穩定配對
     function showResults() {
-      document.getElementById('input-section').style.display = 'none';
-      document.getElementById('check-button').classList.add('hidden');
-      document.getElementById('result-section').classList.remove('hidden');
-      const result = document.getElementById('result');
-      result.classList.add('fade-in');
+      try {
+        document.getElementById('input-section').style.display = 'none';
+        document.getElementById('check-button').classList.add('hidden');
+        document.getElementById('result-section').classList.remove('hidden');
+        const result = document.getElementById('result');
+        result.classList.add('fade-in');
 
-      const matches = galeShapley();
-      if (matches.length === 0) {
-        result.textContent = '無任何配對成功。';
-        result.classList.add('error');
-      } else {
-        const matchesText = '配對成功：' + matches.map(m => `${m[0]} 與 ${m[1]}`).join('，');
-        result.textContent = matchesText;
-        // 複製結果到剪貼簿
-        navigator.clipboard.writeText(matchesText).then(() => {
-          alert('結果已複製到剪貼簿，請貼到備忘錄！');
-        }).catch(() => {
-          alert('複製失敗，請手動複製結果！');
-        });
+        const matches = galeShapley();
+        if (matches.length === 0) {
+          result.textContent = '無任何配對成功。';
+          result.classList.add('error');
+        } else {
+          const matchesText = '配對成功：' + matches.map(m => `${m[0]} 與 ${m[1]}`).join('，');
+          result.textContent = matchesText;
+          navigator.clipboard.writeText(matchesText).then(() => {
+            alert('結果已複製到剪貼簿，請貼到備忘錄！');
+          }).catch(() => {
+            alert('複製失敗，請手動複製結果！');
+          });
+        }
+      } catch (e) {
+        alert('顯示結果失敗：' + e.message);
+        console.error('showResults 錯誤:', e);
       }
     }
 
@@ -456,21 +529,24 @@
 
     // 清除數據
     function clearData() {
-      if (storageAvailable) {
-        try {
+      try {
+        if (storageAvailable) {
           localStorage.removeItem('choices');
-        } catch (e) {
-          console.log('清除localStorage失敗:', e);
         }
+        if (typeof firebase !== 'undefined' && db) {
+          db.ref('submissions').remove((error) => {
+            if (error) {
+              console.log('清除Firebase數據失敗:', error);
+            }
+          });
+        }
+        choices = {};
+        alert('所有數據已清除！');
+        location.reload();
+      } catch (e) {
+        alert('清除數據失敗：' + e.message);
+        console.error('clearData 錯誤:', e);
       }
-      db.ref('submissions').remove((error) => {
-        if (error) {
-          console.log('清除Firebase數據失敗:', error);
-        }
-      });
-      choices = {};
-      alert('所有數據已清除！');
-      location.reload();
     }
   </script>
 </body>
