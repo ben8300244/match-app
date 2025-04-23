@@ -72,6 +72,11 @@
       font-size: 16px;
       margin: 10px 0;
     }
+    .empty {
+      color: #7F8C8D;
+      font-size: 16px;
+      margin: 20px 0;
+    }
     @media (max-width: 600px) {
       .container {
         padding: 15px;
@@ -99,6 +104,7 @@
         </thead>
         <tbody></tbody>
       </table>
+      <p id="empty-message" class="empty hidden">無提交數據</p>
       <button onclick="downloadCSV()">下載CSV</button>
       <button onclick="clearBackendData()">清除後臺數據</button>
     </div>
@@ -113,7 +119,7 @@
       localStorage.removeItem('test');
     } catch (e) {
       storageAvailable = false;
-      document.getElementById('error').textContent = '無法使用本地儲存，請檢查瀏覽器設置！';
+      document.getElementById('error').textContent = '無法使用本地儲存，請檢查瀏覽器設置（可能為隱私模式）！';
       document.getElementById('error').classList.remove('hidden');
       console.warn('localStorage 不可用:', e);
     }
@@ -121,18 +127,52 @@
     // 載入志願序數據
     function loadSubmissions() {
       try {
-        if (!storageAvailable) throw new Error('本地儲存不可用');
-        const choices = JSON.parse(localStorage.getItem('choices') || '{}');
-        const tbody = document.getElementById('submissions').querySelector('tbody');
+        console.log('開始載入數據');
+        const tbody = document.getElementById('submissions')?.querySelector('tbody');
+        if (!tbody) {
+          throw new Error('找不到表格元素');
+        }
         tbody.innerHTML = '';
+        document.getElementById('empty-message').classList.add('hidden');
+
+        if (!storageAvailable) {
+          document.getElementById('empty-message').textContent = '本地儲存不可用，無法顯示數據';
+          document.getElementById('empty-message').classList.remove('hidden');
+          return;
+        }
+
+        const rawChoices = localStorage.getItem('choices');
+        console.log('原始 choices:', rawChoices);
+        let choices = {};
+        try {
+          choices = rawChoices ? JSON.parse(rawChoices) : {};
+        } catch (e) {
+          console.error('JSON 解析失敗:', e);
+          throw new Error('數據格式無效，請清除數據後重試');
+        }
+
+        if (Object.keys(choices).length === 0) {
+          document.getElementById('empty-message').classList.remove('hidden');
+          return;
+        }
+
         for (const voter in choices) {
+          const data = choices[voter];
+          if (!data || !Array.isArray(data.preferences) || !data.timestamp) {
+            console.warn(`無效數據: ${voter}`, data);
+            continue;
+          }
           const row = document.createElement('tr');
           row.innerHTML = `
             <td>${voter}</td>
-            <td>${choices[voter].preferences.join(' > ')}</td>
-            <td>${choices[voter].timestamp}</td>
+            <td>${data.preferences.join(' > ')}</td>
+            <td>${data.timestamp}</td>
           `;
           tbody.appendChild(row);
+        }
+
+        if (tbody.children.length === 0) {
+          document.getElementById('empty-message').classList.remove('hidden');
         }
       } catch (e) {
         document.getElementById('error').textContent = '載入數據失敗：' + e.message;
@@ -145,10 +185,20 @@
     function downloadCSV() {
       try {
         if (!storageAvailable) throw new Error('本地儲存不可用');
-        const choices = JSON.parse(localStorage.getItem('choices') || '{}');
+        const rawChoices = localStorage.getItem('choices');
+        let choices = rawChoices ? JSON.parse(rawChoices) : {};
         let csv = '名稱,志願序,提交時間\n';
         for (const voter in choices) {
-          csv += `${voter},"${choices[voter].preferences.join(' > ')}","${choices[voter].timestamp}"\n`;
+          const data = choices[voter];
+          if (!data || !Array.isArray(data.preferences) || !data.timestamp) {
+            console.warn(`無效數據: ${voter}`, data);
+            continue;
+          }
+          csv += `${voter},"${data.preferences.join(' > ')}","${data.timestamp}"\n`;
+        }
+        if (csv === '名稱,志願序,提交時間\n') {
+          alert('無數據可下載！');
+          return;
         }
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
@@ -180,6 +230,7 @@
 
     // 初始化
     window.addEventListener('load', () => {
+      console.log('後臺頁面載入');
       loadSubmissions();
     });
   </script>
