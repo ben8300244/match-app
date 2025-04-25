@@ -137,7 +137,7 @@
       <button onclick="resetRound()">重置輪次</button>
       <p class="progress" id="progress">已提交：0/8</p>
       <p class="status" id="submitted">已提交：無</p>
-      <p class="status" id="not-submitted">未提交：小牛、小菊、八索、小燕、小ㄚ頭、艾莉、FIFI、雨呈</p>
+      <p class="status" id="not-submitted">未提交：小牛、小菊、八索、小燕、寶寶、艾莉、FIFI、雨呈</p>
     </div>
     <p id="error-message" class="error-message hidden"></p>
   </div>
@@ -168,9 +168,9 @@
         document.getElementById('error-message').classList.remove('hidden');
       }
     }
-    const voters = ['小牛', '小菊', '八索', '小燕', '小ㄚ頭', '艾莉', 'FIFI', '雨呈'];
+    const voters = ['小牛', '小菊', '八索', '小燕', '寶寶', '艾莉', 'FIFI', '雨呈'];
     const aGroup = ['小牛', '小菊', '八索', '小燕'];
-    const bGroup = ['小ㄚ頭', '艾莉', 'FIFI', '雨呈'];
+    const bGroup = ['寶寶', '艾莉', 'FIFI', '雨呈'];
 
     // 清理無效數據
     for (let voter in choices) {
