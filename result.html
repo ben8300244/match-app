@@ -147,9 +147,9 @@
     // 初始化數據
     let choices = storageAvailable ? JSON.parse(localStorage.getItem('choices') || '{}') : {};
     let currentRound = storageAvailable ? parseInt(localStorage.getItem('currentRound') || '1') : 1;
-    const voters = ['小牛', '小菊', '八索', '小燕', '小ㄚ頭', '艾莉', 'FIFI', '雨呈'];
+    const voters = ['小牛', '小菊', '八索', '小燕', '寶寶', '艾莉', 'FIFI', '雨呈'];
     const aGroup = ['小牛', '小菊', '八索', '小燕'];
-    const bGroup = ['小ㄚ頭', '艾莉', 'FIFI', '雨呈'];
+    const bGroup = ['寶寶', '艾莉', 'FIFI', '雨呈'];
 
     // 更新輪次顯示
     function updateRoundDisplay() {
